@@ -9,11 +9,12 @@ TEXT_CHARS = [chr(i) for i in range(48, 91)]
 
 class HtmlHamlParser(HTMLParser):
 
-    def __init__(self):
+    def __init__(self, patchLinks=True):
         super().__init__()
         self._indent = 0
         self._data = self._setup_data()
         self._script_open = False
+        self._patchLinks = patchLinks
 
     def _setup_data(self):
         return '- load static\n'
@@ -58,14 +59,15 @@ class HtmlHamlParser(HTMLParser):
         for attr in attrs:
             key = attr[0]
             value = attr[1]
-            if tag == 'link' and key == 'href':
-                value = self.patch_link_links(value)
-            elif tag == 'a' and key == 'href':
-                value = self.patch_a_links(value)
-            elif tag == 'script' and key == 'src':
-                value = self.patch_script_links(value)
-            elif tag == 'img' and key == 'src':
-                value = self.patch_script_links(value)
+            if self._patchLinks:
+                if tag == 'link' and key == 'href':
+                    value = self.patch_link_links(value)
+                elif tag == 'a' and key == 'href':
+                    value = self.patch_a_links(value)
+                elif tag == 'script' and key == 'src':
+                    value = self.patch_script_links(value)
+                elif tag == 'img' and key == 'src':
+                    value = self.patch_script_links(value)
 
             if key in ('class', 'id'):
                 continue
@@ -114,23 +116,26 @@ class HtmlHamlParser(HTMLParser):
             else:
                 self._data += f'{" " * (self._indent + script_open_indent)}"{s}"\n'
 
-    def default_patch(self, link: str):
+    def default_static_patch(self, link: str):
         if link.startswith('http'):
             return link
 
         return f"{{% static '{link}' %}}"
 
+    def default_link_patch(self, link: str):
+        return link
+
     def patch_link_links(self, link: str):
-        return self.default_patch(link)
+        return self.default_static_patch(link)
 
     def patch_a_links(self, link: str):
-        return self.default_patch(link)
+        return self.default_link_patch(link)
 
     def patch_script_links(self, link: str):
-        return self.default_patch(link)
+        return self.default_static_patch(link)
 
     def patch_img_links(self, link: str):
-        return self.default_patch(link)
+        return self.default_static_patch(link)
 
     def handle_comment(self, data):
         self._data += f'{" " * self._indent}<!-- {data} -->\n'
@@ -145,6 +150,7 @@ if __name__ == '__main__':
 
     parser.add_argument('input', type=str, help='The input file (HTML).')
     parser.add_argument('--output', type=str, default=None, help='Optional name of the output file. Defaults to the name of the input file.')
+    parser.add_argument('--patch-links', type=bool, default=True, help='Convert links to django template style.')
 
     args = parser.parse_args()
     inputFile = args.input
@@ -160,7 +166,7 @@ if __name__ == '__main__':
 
 
     with open(inputFile, 'r') as file:
-        htmlParser = HtmlHamlParser()
+        htmlParser = HtmlHamlParser(patchLinks=args.patch_links)
         htmlParser.feed(file.read())
 
     with open(outputFile, 'w') as file:
