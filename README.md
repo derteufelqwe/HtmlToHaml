@@ -22,7 +22,7 @@ HamlConverter.py index.html
 ``
 <br> Will save the result to `index.haml`
 
-###Example usage 2
+### Example usage 2
 
 ``
 HamlConverter.py index.html --output output.asdf
